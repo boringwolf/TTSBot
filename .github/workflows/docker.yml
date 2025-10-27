@@ -1,4 +1,5 @@
 name: ci
+runs-on: Mac-mini
 
 on:
   push:
