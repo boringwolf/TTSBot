@@ -388,14 +388,49 @@ fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a F
     }
 }
 
+// fn check_valid_voice(data: &Data, code: &FixedString<u8>, mode: TTSMode) -> bool {
+//     match mode {
+//         TTSMode::gTTS | TTSMode::Polly => get_voice_name(data, code, mode).is_some(),
+//         TTSMode::eSpeak => data.espeak_voices.contains(code),
+//         TTSMode::gCloud => code
+//             .split_once(' ')
+//             .and_then(|(language, variant)| data.gcloud_voices.get(language).map(|l| (l, variant)))
+//             .is_some_and(|(ls, v)| ls.contains_key(v)),
+//     }
+// }
+
 fn check_valid_voice(data: &Data, code: &FixedString<u8>, mode: TTSMode) -> bool {
     match mode {
         TTSMode::gTTS | TTSMode::Polly => get_voice_name(data, code, mode).is_some(),
         TTSMode::eSpeak => data.espeak_voices.contains(code),
-        TTSMode::gCloud => code
-            .split_once(' ')
-            .and_then(|(language, variant)| data.gcloud_voices.get(language).map(|l| (l, variant)))
-            .is_some_and(|(ls, v)| ls.contains_key(v)),
+        TTSMode::gCloud => {
+            // Check if the input is the space-separated format (e.g., "en-US A")
+            if code.contains(' ') {
+                code.split_once(' ')
+                    .and_then(|(language, variant)| {
+                        data.gcloud_voices.get(language).map(|l| (l, variant))
+                    })
+                    .is_some_and(|(ls, v)| ls.contains_key(v))
+            } else {
+                // Otherwise, handle the hyphenated format (e.g., "cmn-TW-Wavenet-B")
+                let parts: Vec<&str> = code.as_str().split('-').collect();
+
+                // A valid name must have at least 3 parts (e.g., lang-type-variant)
+                if parts.len() < 3 {
+                    return false;
+                }
+
+                // The language is the first two parts (e.g., "cmn-TW")
+                let language = FixedString::from_str_trunc(&format!("{}-{}", parts[0], parts[1]));
+                // The variant is the rest (e.g., "Wavenet-B")
+                let variant = FixedString::from_str_trunc(&parts[2..].join("-"));
+
+                // Perform the lookup
+                data.gcloud_voices
+                    .get(&language)
+                    .is_some_and(|ls| ls.contains_key(&variant))
+            }
+        }
     }
 }
 
@@ -1271,29 +1306,86 @@ async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> 
     let (lang_variant, mode) = data
         .parse_user_or_guild(ctx.http(), ctx.author().id, ctx.guild_id())
         .await?;
-    let (lang, variant) = match mode {
+    
+    // 將要處理的語音字串提出來，讓後續程式碼更清晰
+    let voice_string_ref = match mode {
         TTSMode::gCloud => &lang_variant,
         _ => TTSMode::gCloud.default_voice(),
-    }
-    .split_once(' ')
-    .unwrap();
+    };
 
+    // --- 風險 1：修正 .unwrap() ---
+    // 使用 if let 安全地處理 .split_once 可能返回 None 的情況
+    let (lang, variant) = if let Some((l, v)) = voice_string_ref.split_once(' ') {
+        (l, v)
+    } else {
+        // 如果格式不對，返回一個有意義的錯誤，而不是讓程式崩潰
+        return Err(anyhow::anyhow!(
+            "儲存的語音格式無效：'{}'. 應為 '語言 變體' 的格式。",
+            voice_string_ref
+        ));
+    };
+
+    // 產生語音列表的部分維持原樣，它的邏輯是安全的
     let pages = data
         .gcloud_voices
         .iter()
         .map(|(language, variants)| {
-            let mut buf = String::with_capacity(variants.len() * 12);
+            let mut buf = String::with_capacity(variants.len() * 20);
             for (variant, gender) in variants {
-                writeln!(buf, "{language} {variant} ({gender})")?;
+                // writeln! 在寫入 String 時不會失敗，但保留 ? 和 anyhow::Ok 也可以
+                let _ = writeln!(buf, "{} {} ({})", language, variant, gender);
             }
-
-            anyhow::Ok(buf)
+            Ok(buf)
         })
-        .collect::<Result<_>>()?;
+        .collect::<Result<Vec<_>>>()?;
 
-    let gender = data.gcloud_voices[lang][variant];
-    Ok((format!("{lang} {variant} ({gender})"), pages))
+    // --- 風險 2：修正 [] 索引 ---
+    // 使用 .get() 和 .and_then() 安全地查詢 Map，避免 key 不存在時的崩潰
+    let gender = data
+        .gcloud_voices
+        .get(lang)
+        .and_then(|variants_map| variants_map.get(variant))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "找不到已儲存的語音：'{} {}'。可能已被移除。",
+                lang,
+                variant
+            )
+        })?;
+
+    // 回傳結果
+    Ok((format!("{} {} ({})", lang, variant, gender), pages))
 }
+
+// async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
+//     let data = ctx.data();
+
+//     let (lang_variant, mode) = data
+//         .parse_user_or_guild(ctx.http(), ctx.author().id, ctx.guild_id())
+//         .await?;
+//     let (lang, variant) = match mode {
+//         TTSMode::gCloud => &lang_variant,
+//         _ => TTSMode::gCloud.default_voice(),
+//     }
+//     .split_once(' ')
+//     .unwrap();
+
+//     let pages = data
+//         .gcloud_voices
+//         .iter()
+//         .map(|(language, variants)| {
+//             let mut buf = String::with_capacity(variants.len() * 12);
+//             for (variant, gender) in variants {
+//                 writeln!(buf, "{language} {variant} ({gender})")?;
+//             }
+
+//             anyhow::Ok(buf)
+//         })
+//         .collect::<Result<_>>()?;
+
+//     let gender = data.gcloud_voices[lang][variant];
+//     Ok((format!("{lang} {variant} ({gender})"), pages))
+// }
 
 pub fn commands() -> [Command; 5] {
     [

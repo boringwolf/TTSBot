@@ -138,6 +138,50 @@ pub fn random_footer(server_invite: &str, client_id: serenity::UserId) -> Cow<'s
     }
 }
 
+fn get_custom_emoji_text(emoji_name: &str) -> Option<&'static str> {
+    match emoji_name {
+        "G_Play_Dead" => Some("開始裝死"),
+        "G_Slap" => Some("甩了一巴掌"),
+        "G_Cheer_On" => Some("開始聲援"),
+        "G_Grovel" => Some("下跪道歉"),
+        "G_Snap" => Some("華麗得打了個響指"),
+        "G_Sweep_Up" => Some("開始清掃"),
+        "G_Thumbs_Up" => Some("豎起大拇指"),
+        "G_Cheer_Jump" => Some("跳躍歡呼"),
+        "G_Cheer_Wave" => Some("揮手歡呼"),
+        "shrug" => Some("聳了聳肩"),
+        "G_Show_Right" => Some("向大家展現右邊事物的魅力"),
+        "G_Show_Left" => Some("向大家展現左邊事物的魅力"),
+        "B1_TankRole" => Some("坦克"),
+        "B2_HealerRole" => Some("治療"),
+        "B3_DPSRole" => Some("DPS"),
+        "C_DarkKnight" => Some("暗黑騎士"),
+        "C_Gunbreaker" => Some("絕槍戰士"),
+        "C_Paladin" => Some("騎士"),
+        "C_Warrior" => Some("戰士"),
+        "D_Astrologian" => Some("占星術士"),
+        "D_Sage" => Some("賢者"),
+        "D_Scholar" => Some("學者"),
+        "D_WhiteMage" => Some("白魔法師"),
+        "E_Bard" => Some("吟遊詩人"),
+        "E_BlackMage" => Some("黑魔法師"),
+        "E_BlueMage" => Some("青魔法師"),
+        "E_Dancer" => Some("舞者"),
+        "E_Dragoon" => Some("龍騎士"),
+        "E_Machinist" => Some("機工士"),
+        "E_Monk" => Some("武僧"),
+        "E_Ninja" => Some("忍者"),
+        "E_Pictomancer" => Some("繪靈法師"),
+        "E_Reaper" => Some("鐮刀使"),
+        "E_RedMage" => Some("紅魔法師"),
+        "E_Samurai" => Some("武士"),
+        "E_Summoner" => Some("召喚師"),
+        "E_Viper" => Some("蝰蛇使"),
+        "AEFEDW" => Some("魚油覺得很讚"),
+        _ => None,
+    }
+}
+
 fn strip_emoji<'c>(regex_cache: &RegexCache, content: &'c str) -> Cow<'c, str> {
     regex_cache.emoji_filter.replace_all(content, "")
 }
@@ -149,6 +193,12 @@ fn make_emoji_readable<'c>(regex_cache: &RegexCache, content: &'c str) -> Cow<'c
             let is_animated = re_match.get(1).unwrap().as_str();
             let emoji_name = re_match.get(2).unwrap().as_str();
 
+            // Check for custom emoji text mapping first
+            if let Some(custom_text) = get_custom_emoji_text(emoji_name) {
+                return custom_text.to_string();
+            }
+
+            // Use default format if no custom mapping exists
             let emoji_prefix = if is_animated.is_empty() {
                 "emoji"
             } else {
@@ -163,7 +213,7 @@ fn parse_acronyms(original: &str) -> String {
     original
         .split(' ')
         .map(|word| match word {
-            "iirc" => "if I recall correctly",
+            "iirc" => "if i recall correctly",
             "afaik" => "as far as I know",
             "wdym" => "what do you mean",
             "imo" => "in my opinion",
@@ -190,20 +240,20 @@ fn parse_acronyms(original: &str) -> String {
 
 fn attachments_to_format(attachments: &[serenity::Attachment]) -> Option<&'static str> {
     if attachments.len() >= 2 {
-        return Some("multiple files");
+        return Some("多個檔案");
     }
 
     let extension = attachments.first()?.filename.split('.').next_back()?;
     match extension {
-        "bmp" | "gif" | "ico" | "png" | "psd" | "svg" | "jpg" => Some("an image file"),
-        "mid" | "midi" | "mp3" | "ogg" | "wav" | "wma" => Some("an audio file"),
-        "avi" | "mp4" | "wmv" | "m4v" | "mpg" | "mpeg" => Some("a video file"),
-        "zip" | "7z" | "rar" | "gz" | "xz" => Some("a compressed file"),
-        "doc" | "docx" | "txt" | "odt" | "rtf" => Some("a text file"),
-        "bat" | "sh" | "jar" | "py" | "php" => Some("a script file"),
-        "apk" | "exe" | "msi" | "deb" => Some("a program file"),
-        "dmg" | "iso" | "img" | "ima" => Some("a disk image"),
-        _ => Some("a file"),
+        "bmp" | "gif" | "ico" | "png" | "psd" | "svg" | "jpg" => Some("一張圖片"),
+        "mid" | "midi" | "mp3" | "ogg" | "wav" | "wma" => Some("一個音訊"),
+        "avi" | "mp4" | "wmv" | "m4v" | "mpg" | "mpeg" => Some("一個影片"),
+        "zip" | "7z" | "rar" | "gz" | "xz" => Some("一個壓縮檔"),
+        "doc" | "docx" | "txt" | "odt" | "rtf" => Some("一個文字檔"),
+        "bat" | "sh" | "jar" | "py" | "php" => Some("一個程式碼檔案"),
+        "apk" | "exe" | "msi" | "deb" => Some("一個可執行檔"),
+        "dmg" | "iso" | "img" | "ima" => Some("一個映像檔"),
+        _ => Some("一個檔案"),
     }
 }
 
@@ -242,8 +292,16 @@ pub fn clean_msg(
         let mut content = if skip_emoji {
             strip_emoji(regex_cache, content)
         } else {
-            make_emoji_readable(regex_cache, content)
+            // Process template text pattern first (before other emojis)
+            let content = regex_cache.template_text_pattern.replace_all(content, "定型文，$1").into_owned();
+            println!("DEBUG: After template_text_pattern: {}", content);
+            // Then process other emojis
+            let result = Cow::Owned(make_emoji_readable(regex_cache, &content).into_owned());
+            println!("DEBUG: After make_emoji_readable: {}", result);
+            result
         };
+
+        println!("DEBUG: Content after emoji processing (skip_emoji={}): {}", skip_emoji, content);
 
         for (regex, replacement) in &regex_cache.replacements {
             if let Cow::Owned(replaced) = regex.replace_all(&content, *replacement) {
@@ -306,24 +364,24 @@ pub fn format_message_legacy(
     if let Some(said_name) = said_name {
         if contained_url {
             let suffix = if content.is_empty() {
-                "a link."
+                "一個連結."
             } else {
-                "and sent a link"
+                "並送了一個連結"
             };
 
             write!(content, " {suffix}",).unwrap();
         }
 
         *content = match attached_file_format {
-            Some(file_format) if content.is_empty() => format!("{said_name} sent {file_format}"),
-            Some(file_format) => format!("{said_name} sent {file_format} and said {content}"),
-            None => format!("{said_name} said: {content}"),
+            Some(file_format) if content.is_empty() => format!("{said_name} 傳送了 {file_format}"),
+            Some(file_format) => format!("{said_name} 傳送了 {file_format} 並說 {content}"),
+            None => format!("{said_name} 說: {content}"),
         }
     } else if contained_url {
         let suffix = if content.is_empty() {
-            " a link."
+            " 一個連結."
         } else {
-            ". This message contained a link"
+            ". 這段訊息包含了一個連結"
         };
 
         write!(content, "{suffix}",).unwrap();
@@ -343,35 +401,35 @@ pub fn format_message(
         attached_file_format,
     ) {
         (Some(said_name), "", true, Some(format)) => {
-            *content = format!("{said_name} sent a link and attached {format}");
+            *content = format!("{said_name} 傳送了一個連結並附上 {format}");
         }
         (Some(said_name), "", true, None) => {
-            *content = format!("{said_name} sent a link");
+            *content = format!("{said_name} 傳送了一個連結");
         }
         (Some(said_name), "", false, Some(format)) => {
-            *content = format!("{said_name} sent {format}");
+            *content = format!("{said_name} 傳送了 {format}");
         }
         // Fallback, this shouldn't occur
         (Some(said_name), "", false, None) => {
-            *content = format!("{said_name} sent a message");
+            *content = format!("{said_name} 傳送了一則訊息");
         }
         (Some(said_name), msg, true, Some(format)) => {
-            *content = format!("{said_name} sent a link, attached {format}, and said {msg}");
+            *content = format!("{said_name} 傳送了一個連結，附上 {format}，並說：{msg}");
         }
         (Some(said_name), msg, true, None) => {
-            *content = format!("{said_name} sent a link and said {msg}");
+            *content = format!("{said_name} 傳送了一個連結並說：{msg}");
         }
         (Some(said_name), msg, false, Some(format)) => {
-            *content = format!("{said_name} sent {format} and said {msg}");
+            *content = format!("{said_name} 傳送了 {format} 並說：{msg}");
         }
         (Some(said_name), msg, false, None) => {
-            *content = format!("{said_name} said: {msg}");
+            *content = format!("{said_name} 說：{msg}");
         }
         (None, "", true, Some(format)) => {
-            *content = format!("A link and {format}");
+            *content = format!("一個連結和 {format}");
         }
         (None, "", true, None) => {
-            "A link".clone_into(content);
+            "一個連結".clone_into(content);
         }
         (None, "", false, Some(format)) => {
             format.clone_into(content);
@@ -379,13 +437,13 @@ pub fn format_message(
         // Again, fallback, there is nothing to say
         (None, "", false, None) => {}
         (None, msg, true, Some(format)) => {
-            *content = format!("{msg} with {format} and a link");
+            *content = format!("{msg}，包含 {format} 與一個連結");
         }
         (None, msg, true, None) => {
-            *content = format!("{msg} with a link");
+            *content = format!("{msg}，包含一個連結");
         }
         (None, msg, false, Some(format)) => {
-            *content = format!("{msg} with {format}");
+            *content = format!("{msg}，包含 {format}");
         }
         (None, _msg, false, None) => {}
     }

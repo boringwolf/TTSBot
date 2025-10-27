@@ -86,7 +86,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         fetch_translation_languages(&reqwest, tts_service(), auth_key),
         async { Ok(http.get_bot_gateway().await?.shards) },
         async {
-            let res = serenity::UserId::new(802632257658683442)
+            let res = serenity::UserId::new(163128886782197761)
                 .to_user(&http)
                 .await?;
 
@@ -131,7 +131,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
             .into_iter()
             .map(|v| (v.id.clone(), v))
             .collect::<BTreeMap<_, _>>(),
-
         config: config.main,
         premium_config: config.premium,
         website_info: Mutex::new(config.website_info),

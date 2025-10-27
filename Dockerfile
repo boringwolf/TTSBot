@@ -10,7 +10,7 @@ RUN cargo build --release
 # Now make the runtime container
 FROM debian:trixie-slim
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y ca-certificates mold && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && apt-get install -y ca-certificates mold && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /bot/target/release/tts_bot /usr/local/bin/discord_tts_bot
 

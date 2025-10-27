@@ -79,6 +79,7 @@ pub struct MainConfig {
 pub struct PostgresConfig {
     pub host: String,
     pub user: String,
+    pub port: u16,
     pub database: String,
     pub password: String,
     pub max_connections: Option<u32>,
@@ -181,6 +182,7 @@ pub struct RegexCache {
     pub id_in_brackets: regex::Regex,
     pub emoji_captures: regex::Regex,
     pub emoji_filter: regex::Regex,
+    pub template_text_pattern: regex::Regex,
 }
 
 impl RegexCache {
@@ -197,6 +199,7 @@ impl RegexCache {
             id_in_brackets: regex::Regex::new(r"\((\d+)\)")?,
             emoji_captures: regex::Regex::new(r"<(a?):([^<>]+):\d+>")?,
             emoji_filter: regex::Regex::new(r"(?s:<a?:[^<>]+:\d+>)|\p{Emoji_Presentation}")?,
+            template_text_pattern: regex::Regex::new(r"<:Xbcontroller_54:\d+> (.+?) <:Xbcontroller_55:\d+>")?,
             bot_mention: OnceLock::new(),
         })
     }

@@ -235,6 +235,7 @@ pub async fn load_db_and_conf() -> Result<(sqlx::PgPool, Config)> {
 
     let pool_options = sqlx::postgres::PgConnectOptions::new()
         .host(&postgres.host)
+        .port(postgres.port)
         .username(&postgres.user)
         .database(&postgres.database)
         .password(&postgres.password);

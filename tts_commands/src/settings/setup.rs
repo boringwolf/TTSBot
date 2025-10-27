@@ -163,7 +163,7 @@ fn generate_channel_select(text_channels: &[ChannelMenuEntry]) -> Vec<CreateComp
 pub async fn setup(
     ctx: Context<'_>,
     #[description = "The channel for the bot to read messages from"]
-    #[channel_types("Text")]
+    #[channel_types("Text", "Voice")]
     channel: Option<serenity::GuildChannel>,
 ) -> CommandResult {
     let data = ctx.data();

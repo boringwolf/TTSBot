@@ -86,26 +86,57 @@ pub async fn fetch_translation_languages(
     Ok(lang_map.collect())
 }
 
+// pub fn prepare_gcloud_voices(
+//     raw_map: Vec<GoogleVoice>,
+// ) -> BTreeMap<FixedString<u8>, BTreeMap<FixedString<u8>, GoogleGender>> {
+//     // {lang_accent: {variant: gender}}
+//     let mut cleaned_map = BTreeMap::new();
+//     for gvoice in raw_map {
+//         let variant = gvoice
+//             .name
+//             .splitn(3, '-')
+//             .nth(2)
+//             .and_then(|mode_variant| mode_variant.split_once('-'))
+//             .filter(|(mode, _)| *mode == "Standard")
+//             .map(|(_, variant)| variant);
+
+//         if let Some(variant) = variant {
+//             let [language] = gvoice.language_codes;
+//             cleaned_map
+//                 .entry(language)
+//                 .or_insert_with(BTreeMap::new)
+//                 .insert(FixedString::from_str_trunc(variant), gvoice.ssml_gender);
+//         }
+//     }
+
+//     cleaned_map
+// }
+
 pub fn prepare_gcloud_voices(
     raw_map: Vec<GoogleVoice>,
 ) -> BTreeMap<FixedString<u8>, BTreeMap<FixedString<u8>, GoogleGender>> {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
     for gvoice in raw_map {
-        let variant = gvoice
-            .name
-            .splitn(3, '-')
-            .nth(2)
-            .and_then(|mode_variant| mode_variant.split_once('-'))
-            .filter(|(mode, _)| *mode == "Standard")
-            .map(|(_, variant)| variant);
+        // 1. 先取得語言碼之後的完整部分 (例如 "Standard-A" 或 "Wavenet-F")
+        if let Some(type_and_variant) = gvoice.name.splitn(3, '-').nth(2) {
+            
+            // 2. 判斷這部分是否為 "Standard-" 開頭
+            let final_variant =
+                if let Some(("Standard", variant_code)) = type_and_variant.split_once('-') {
+                    // 是 Standard，使用舊格式 -> "A"
+                    variant_code
+                } else {
+                    // 不是 Standard，使用新格式 -> "Wavenet-F"
+                    type_and_variant
+                };
 
-        if let Some(variant) = variant {
-            let [language] = gvoice.language_codes;
+            // 3. 使用正確的 snake_case 欄位名稱來存入 map
+            let language = &gvoice.language_codes[0]; // 使用 language_codes
             cleaned_map
-                .entry(language)
+                .entry(FixedString::from_str_trunc(language))
                 .or_insert_with(BTreeMap::new)
-                .insert(FixedString::from_str_trunc(variant), gvoice.ssml_gender);
+                .insert(FixedString::from_str_trunc(final_variant), gvoice.ssml_gender); // 使用 ssml_gender
         }
     }
 
