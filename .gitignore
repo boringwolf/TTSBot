@@ -1,6 +1,15 @@
+# IDE and editor files
 .vscode
+
+# Hidden files
 *.hidden
+
+# Docker and configuration
 docker-compose.yml
 /config.toml
+
+# Build artifacts
 /target
+
+# Credentials
 gcp.json
