@@ -178,6 +178,7 @@ fn get_custom_emoji_text(emoji_name: &str) -> Option<&'static str> {
         "e_summoner" => Some("召喚師"),
         "e_viper" => Some("蝰蛇使"),
         "aefedw" => Some("魚油覺得很讚"),
+        "1178318703922790401" => Some("emoji 一百一十七京"),
         _ => None,
     }
 }
